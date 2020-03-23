@@ -6,6 +6,8 @@
 
 #include "json.h"
 
+#define BUF_SIZE 1024
+
 static void error(const char *msg) {
   fprintf(stderr, "jn: %s\n", msg);
   exit(2);
@@ -32,17 +34,44 @@ static char *read_file(const char *path) {
   return data;
 }
 
+static char *read_stdin() {
+  char buffer[BUF_SIZE];
+  size_t data_size = 1; // includes NULL
+  char *data = malloc(sizeof(char) * BUF_SIZE);
+  if(data == NULL) 
+    error("malloc fail");
+
+  data[0] = '\0';
+  while(fgets(buffer, BUF_SIZE, stdin)) {
+    data_size += strlen(buffer);
+    data = realloc(data, data_size);
+    if(data == NULL)
+      error("realloc fail");
+    strcat(data, buffer);
+  }
+
+  if(ferror(stdin)) {
+      free(data);
+      error("Error reading from stdin.");
+  }
+  return data;
+}
+
 int main(int argc, char **argv) {
-  int ch;
-  while ((ch = getopt(argc, argv, "n")) != -1)
-    switch (ch) {
+  int ch; 
+  while ((ch = getopt(argc, argv, "n")) != -1) switch (ch) {
       default: goto using;
-    }
-  argc -= optind; argv += optind;
+  } argc -= optind; argv += optind;
+
   if (argc == 0) goto using;
-  char *test = read_file(argv[0]);
-  struct JsonValue j = json_parse(test);
-  free(test);
+
+  char *json;
+  if (argv[0][0] == '-')
+    json = read_stdin();
+  else 
+    json = read_file(argv[0]);
+  struct JsonValue j = json_parse(json);
+  free(json);
 
   struct JsonValue *tmp = &j;
   for (int i = 1; i < argc; i++) {
